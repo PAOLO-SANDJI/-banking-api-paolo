@@ -1,0 +1,18 @@
+{
+  "name": "banking-api-paolo",
+  "version": "1.0.0",
+  "description": "API bancaire - Paolo",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Paolo",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.2.1",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1"
+  }
+}
