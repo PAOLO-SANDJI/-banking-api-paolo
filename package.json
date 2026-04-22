@@ -1,18 +1,22 @@
 {
   "name": "banking-api-paolo",
   "version": "1.0.0",
-  "description": "API bancaire - Paolo",
+  "description": "API bancaire - Paolo (architecture modulaire)",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node tests/runner.js",
+    "pdf": "node tools/generate-pdf.js"
   },
   "keywords": [],
-  "author": "Paolo",
+  "author": "Paolo Sandji",
   "license": "ISC",
   "dependencies": {
     "express": "^5.2.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"
+  },
+  "devDependencies": {
+    "marked": "^18.0.2"
   }
 }
