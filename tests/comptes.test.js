@@ -1,68 +1,130 @@
-const { http, creerCompte, creerRegistre } = require("./helpers");
+import { describe, it, expect } from 'vitest'
+import request from 'supertest'
+import { createRequire } from 'module'
+const require = createRequire(import.meta.url)
+const { creerApp } = require('../src/app.js')
 
-async function run() {
-  const { results, tc } = creerRegistre();
-  console.log("\n[Comptes]");
+const app = creerApp()
 
-  await tc("TC-101", "Création valide", async () => {
-    const r = await http("POST", "/api/comptes", { nom: "Sandji", prenom: "Paolo" });
-    return (r.status === 201 && r.data.succes === true && r.data.donnees.solde === "0.00 FCFA")
-      || `status=${r.status}`;
-  });
-
-  await tc("TC-102", "Nom manquant", async () => {
-    const r = await http("POST", "/api/comptes", { prenom: "Paolo" });
-    return r.status === 400 || `status=${r.status}`;
-  });
-
-  await tc("TC-103", "Prénom manquant", async () => {
-    const r = await http("POST", "/api/comptes", { nom: "Sandji" });
-    return r.status === 400 || `status=${r.status}`;
-  });
-
-  await tc("TC-104", "Corps vide", async () => {
-    const r = await http("POST", "/api/comptes", {});
-    return r.status === 400 || `status=${r.status}`;
-  });
-
-  await tc("TC-105", "Nom vide", async () => {
-    const r = await http("POST", "/api/comptes", { nom: "", prenom: "P" });
-    return r.status === 400 || `status=${r.status}`;
-  });
-
-  await tc("TC-106", "Prénom vide", async () => {
-    const r = await http("POST", "/api/comptes", { nom: "S", prenom: "" });
-    return r.status === 400 || `status=${r.status}`;
-  });
-
-  await tc("TC-107", "IDs uniques", async () => {
-    const id1 = await creerCompte("A", "A");
-    const id2 = await creerCompte("B", "B");
-    return id1 !== id2 || "ids identiques";
-  });
-
-  await tc("TC-108", "Liste non-null (array)", async () => {
-    const r = await http("GET", "/api/comptes");
-    return (r.status === 200 && Array.isArray(r.data.donnees)) || `status=${r.status}`;
-  });
-
-  await tc("TC-109", "Consultation ID valide", async () => {
-    const id = await creerCompte("Consult", "Test");
-    const r = await http("GET", `/api/comptes/${id}`);
-    return (r.status === 200 && r.data.donnees.id === id) || `status=${r.status}`;
-  });
-
-  await tc("TC-110", "Consultation ID inexistant", async () => {
-    const r = await http("GET", "/api/comptes/00000000-0000-0000-0000-000000000000");
-    return r.status === 404 || `status=${r.status}`;
-  });
-
-  await tc("TC-111", "Consultation ID malformé", async () => {
-    const r = await http("GET", "/api/comptes/abc");
-    return r.status === 404 || `status=${r.status}`;
-  });
-
-  return results;
+async function getToken() {
+  await request(app).post('/auth/register').send({
+    nom: 'Sandji', prenom: 'Paolo', email: 'test@comptes.com', password: 'secret123',
+  })
+  const res = await request(app).post('/auth/login').send({
+    email: 'test@comptes.com', password: 'secret123',
+  })
+  return res.body.donnees.token
 }
 
-module.exports = { run };
+describe('Comptes — Création', () => {
+  it('TC-101 — Création valide retourne 201 + UUID + solde 0 FCFA', async () => {
+    const token = await getToken()
+    const res = await request(app)
+      .post('/api/comptes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nom: 'Sandji', prenom: 'Paolo' })
+    expect(res.status).toBe(201)
+    expect(res.body.donnees.id).toMatch(/^[0-9a-f-]{36}$/)
+    expect(res.body.donnees.solde).toBe('0.00 FCFA')
+  })
+
+  it('TC-102 — Nom manquant retourne 400', async () => {
+    const token = await getToken()
+    const res = await request(app)
+      .post('/api/comptes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ prenom: 'Paolo' })
+    expect(res.status).toBe(400)
+  })
+
+  it('TC-103 — Prénom manquant retourne 400', async () => {
+    const token = await getToken()
+    const res = await request(app)
+      .post('/api/comptes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nom: 'Sandji' })
+    expect(res.status).toBe(400)
+  })
+
+  it('TC-104 — Corps vide retourne 400', async () => {
+    const token = await getToken()
+    const res = await request(app)
+      .post('/api/comptes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({})
+    expect(res.status).toBe(400)
+  })
+
+  it('TC-105 — Nom vide retourne 400', async () => {
+    const token = await getToken()
+    const res = await request(app)
+      .post('/api/comptes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nom: '', prenom: 'P' })
+    expect(res.status).toBe(400)
+  })
+
+  it('TC-106 — Prénom vide retourne 400', async () => {
+    const token = await getToken()
+    const res = await request(app)
+      .post('/api/comptes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nom: 'S', prenom: '' })
+    expect(res.status).toBe(400)
+  })
+
+  it('TC-107 — Deux créations produisent des UUIDs différents', async () => {
+    const token = await getToken()
+    const r1 = await request(app).post('/api/comptes').set('Authorization', `Bearer ${token}`).send({ nom: 'A', prenom: 'B' })
+    const r2 = await request(app).post('/api/comptes').set('Authorization', `Bearer ${token}`).send({ nom: 'C', prenom: 'D' })
+    expect(r1.body.donnees.id).not.toBe(r2.body.donnees.id)
+  })
+
+  it('TC-108 — Sans token retourne 401', async () => {
+    const res = await request(app).post('/api/comptes').send({ nom: 'A', prenom: 'B' })
+    expect(res.status).toBe(401)
+  })
+})
+
+describe('Comptes — Listing et consultation', () => {
+  it('TC-109 — GET /api/comptes retourne un tableau', async () => {
+    const token = await getToken()
+    const res = await request(app).get('/api/comptes').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.donnees)).toBe(true)
+  })
+
+  it('TC-110 — Listing isolé par utilisateur', async () => {
+    const token = await getToken()
+    await request(app).post('/api/comptes').set('Authorization', `Bearer ${token}`).send({ nom: 'A', prenom: 'B' })
+
+    // Deuxième utilisateur
+    await request(app).post('/auth/register').send({ nom: 'X', prenom: 'Y', email: 'autre@test.com', password: 'pass123' })
+    const r2 = await request(app).post('/auth/login').send({ email: 'autre@test.com', password: 'pass123' })
+    const token2 = r2.body.donnees.token
+
+    const res = await request(app).get('/api/comptes').set('Authorization', `Bearer ${token2}`)
+    expect(res.body.donnees).toHaveLength(0)
+  })
+
+  it('TC-111 — Consultation ID valide retourne 200', async () => {
+    const token = await getToken()
+    const cr = await request(app).post('/api/comptes').set('Authorization', `Bearer ${token}`).send({ nom: 'A', prenom: 'B' })
+    const id = cr.body.donnees.id
+    const res = await request(app).get(`/api/comptes/${id}`).set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(res.body.donnees.id).toBe(id)
+  })
+
+  it('TC-112 — Consultation ID inexistant retourne 404', async () => {
+    const token = await getToken()
+    const res = await request(app).get('/api/comptes/00000000-0000-0000-0000-000000000000').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(404)
+  })
+
+  it('TC-113 — Consultation ID malformé retourne 404', async () => {
+    const token = await getToken()
+    const res = await request(app).get('/api/comptes/abc').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(404)
+  })
+})

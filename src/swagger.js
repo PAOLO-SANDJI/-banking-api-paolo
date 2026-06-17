@@ -35,11 +35,47 @@ API REST modulaire pour la gestion de comptes bancaires.
     },
     tags: [
       { name: "Général", description: "Informations sur l'API" },
+      { name: "Auth", description: "Inscription, connexion et profil" },
       { name: "Comptes", description: "Gestion des comptes bancaires" },
       { name: "Transactions", description: "Dépôts, retraits et historique" },
     ],
     components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+        },
+      },
       schemas: {
+        InscriptionRequete: {
+          type: "object",
+          required: ["nom", "prenom", "email", "password"],
+          properties: {
+            nom: { type: "string", example: "Sandji" },
+            prenom: { type: "string", example: "Paolo" },
+            email: { type: "string", format: "email", example: "paolo@exemple.com" },
+            password: { type: "string", minLength: 6, example: "secret123" },
+          },
+        },
+        ConnexionRequete: {
+          type: "object",
+          required: ["email", "password"],
+          properties: {
+            email: { type: "string", format: "email", example: "paolo@exemple.com" },
+            password: { type: "string", example: "secret123" },
+          },
+        },
+        Utilisateur: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            nom: { type: "string" },
+            prenom: { type: "string" },
+            email: { type: "string", format: "email" },
+            dateInscription: { type: "string" },
+          },
+        },
         Compte: {
           type: "object",
           required: ["id", "nom", "prenom", "solde", "dateCreation"],

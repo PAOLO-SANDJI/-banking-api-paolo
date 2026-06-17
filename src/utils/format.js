@@ -15,14 +15,14 @@ function formaterCompte(compte) {
     nom: compte.nom,
     prenom: compte.prenom,
     solde: formaterMontant(compte.solde),
-    dateCreation: formaterDate(compte.dateCreation),
+    dateCreation: formaterDate(compte.date_creation || compte.dateCreation),
   };
 }
 
 function formaterTransaction(transaction) {
   return {
     id: transaction.id,
-    compteId: transaction.compteId,
+    compteId: transaction.compte_id || transaction.compteId,
     type: transaction.type,
     montant: formaterMontant(transaction.montant),
     date: formaterDate(transaction.date),

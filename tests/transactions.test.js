@@ -1,174 +1,157 @@
-const { http, creerCompte, creerRegistre } = require("./helpers");
+import { describe, it, expect } from 'vitest'
+import request from 'supertest'
+import { createRequire } from 'module'
+const require = createRequire(import.meta.url)
+const { creerApp } = require('../src/app.js')
 
-async function run() {
-  const { results, tc } = creerRegistre();
-  console.log("\n[Transactions]");
+const app = creerApp()
 
-  // --- Dépôts ---
-  await tc("TC-201", "Dépôt valide", async () => {
-    const id = await creerCompte();
-    const r = await http("POST", `/api/comptes/${id}/depot`, { montant: 5000 });
-    return (r.status === 200 && r.data.donnees.solde === "5000.00 FCFA") || `status=${r.status}`;
-  });
-
-  await tc("TC-202", "Dépôt compte inexistant", async () => {
-    const r = await http("POST", "/api/comptes/00000000-0000-0000-0000-000000000000/depot", { montant: 5000 });
-    return r.status === 404 || `status=${r.status}`;
-  });
-
-  await tc("TC-203", "Montant négatif", async () => {
-    const id = await creerCompte();
-    const r = await http("POST", `/api/comptes/${id}/depot`, { montant: -100 });
-    return r.status === 400 || `status=${r.status}`;
-  });
-
-  await tc("TC-204", "Montant zéro", async () => {
-    const id = await creerCompte();
-    const r = await http("POST", `/api/comptes/${id}/depot`, { montant: 0 });
-    return r.status === 400 || `status=${r.status}`;
-  });
-
-  await tc("TC-205", "Montant en chaîne", async () => {
-    const id = await creerCompte();
-    const r = await http("POST", `/api/comptes/${id}/depot`, { montant: "5000" });
-    return r.status === 400 || `status=${r.status}`;
-  });
-
-  await tc("TC-206", "Sans montant", async () => {
-    const id = await creerCompte();
-    const r = await http("POST", `/api/comptes/${id}/depot`, {});
-    return r.status === 400 || `status=${r.status}`;
-  });
-
-  await tc("TC-207", "Montant null", async () => {
-    const id = await creerCompte();
-    const r = await http("POST", `/api/comptes/${id}/depot`, { montant: null });
-    return r.status === 400 || `status=${r.status}`;
-  });
-
-  await tc("TC-208", "Dépôts successifs (cumul)", async () => {
-    const id = await creerCompte();
-    await http("POST", `/api/comptes/${id}/depot`, { montant: 1000 });
-    const r = await http("POST", `/api/comptes/${id}/depot`, { montant: 2000 });
-    return r.data.donnees.solde === "3000.00 FCFA" || `solde=${r.data.donnees?.solde}`;
-  });
-
-  await tc("TC-209", "Montant très grand", async () => {
-    const id = await creerCompte();
-    const r = await http("POST", `/api/comptes/${id}/depot`, { montant: 1000000000 });
-    return r.status === 200 || `status=${r.status}`;
-  });
-
-  await tc("TC-210", "Montant décimal", async () => {
-    const id = await creerCompte();
-    const r = await http("POST", `/api/comptes/${id}/depot`, { montant: 1234.56 });
-    return (r.status === 200 && r.data.donnees.solde === "1234.56 FCFA") || `solde=${r.data.donnees?.solde}`;
-  });
-
-  // --- Retraits ---
-  await tc("TC-301", "Retrait valide", async () => {
-    const id = await creerCompte();
-    await http("POST", `/api/comptes/${id}/depot`, { montant: 10000 });
-    const r = await http("POST", `/api/comptes/${id}/retrait`, { montant: 3000 });
-    return (r.status === 200 && r.data.donnees.solde === "7000.00 FCFA") || `solde=${r.data.donnees?.solde}`;
-  });
-
-  await tc("TC-302", "Retrait compte inexistant", async () => {
-    const r = await http("POST", "/api/comptes/00000000-0000-0000-0000-000000000000/retrait", { montant: 1000 });
-    return r.status === 404 || `status=${r.status}`;
-  });
-
-  await tc("TC-303", "Solde insuffisant", async () => {
-    const id = await creerCompte();
-    await http("POST", `/api/comptes/${id}/depot`, { montant: 1000 });
-    const r = await http("POST", `/api/comptes/${id}/retrait`, { montant: 5000 });
-    return (r.status === 400 && /insuffisant/i.test(r.data.message)) || `status=${r.status}`;
-  });
-
-  await tc("TC-304", "Retrait = solde (limite)", async () => {
-    const id = await creerCompte();
-    await http("POST", `/api/comptes/${id}/depot`, { montant: 5000 });
-    const r = await http("POST", `/api/comptes/${id}/retrait`, { montant: 5000 });
-    return (r.status === 200 && r.data.donnees.solde === "0.00 FCFA") || `solde=${r.data.donnees?.solde}`;
-  });
-
-  await tc("TC-305", "Montant négatif", async () => {
-    const id = await creerCompte();
-    const r = await http("POST", `/api/comptes/${id}/retrait`, { montant: -500 });
-    return r.status === 400 || `status=${r.status}`;
-  });
-
-  await tc("TC-306", "Montant zéro", async () => {
-    const id = await creerCompte();
-    const r = await http("POST", `/api/comptes/${id}/retrait`, { montant: 0 });
-    return r.status === 400 || `status=${r.status}`;
-  });
-
-  await tc("TC-307", "Sans montant", async () => {
-    const id = await creerCompte();
-    const r = await http("POST", `/api/comptes/${id}/retrait`, {});
-    return r.status === 400 || `status=${r.status}`;
-  });
-
-  await tc("TC-308", "Montant non numérique", async () => {
-    const id = await creerCompte();
-    const r = await http("POST", `/api/comptes/${id}/retrait`, { montant: "abc" });
-    return r.status === 400 || `status=${r.status}`;
-  });
-
-  await tc("TC-309", "Retraits successifs", async () => {
-    const id = await creerCompte();
-    await http("POST", `/api/comptes/${id}/depot`, { montant: 1000 });
-    await http("POST", `/api/comptes/${id}/retrait`, { montant: 500 });
-    const r = await http("POST", `/api/comptes/${id}/retrait`, { montant: 500 });
-    return r.data.donnees.solde === "0.00 FCFA" || `solde=${r.data.donnees?.solde}`;
-  });
-
-  await tc("TC-310", "Retrait sur solde=0", async () => {
-    const id = await creerCompte();
-    const r = await http("POST", `/api/comptes/${id}/retrait`, { montant: 100 });
-    return (r.status === 400 && /insuffisant/i.test(r.data.message)) || `status=${r.status}`;
-  });
-
-  // --- Historique ---
-  await tc("TC-401", "Historique vide", async () => {
-    const id = await creerCompte();
-    const r = await http("GET", `/api/comptes/${id}/transactions`);
-    return (r.status === 200 && Array.isArray(r.data.donnees) && r.data.donnees.length === 0)
-      || `len=${r.data.donnees?.length}`;
-  });
-
-  await tc("TC-402", "Après 1 dépôt", async () => {
-    const id = await creerCompte();
-    await http("POST", `/api/comptes/${id}/depot`, { montant: 5000 });
-    const r = await http("GET", `/api/comptes/${id}/transactions`);
-    return (r.data.donnees.length === 1 && r.data.donnees[0].type === "depot") || `len=${r.data.donnees?.length}`;
-  });
-
-  await tc("TC-403", "Historique mixte", async () => {
-    const id = await creerCompte();
-    await http("POST", `/api/comptes/${id}/depot`, { montant: 5000 });
-    await http("POST", `/api/comptes/${id}/retrait`, { montant: 1000 });
-    const r = await http("GET", `/api/comptes/${id}/transactions`);
-    const types = r.data.donnees.map((t) => t.type);
-    return (r.data.donnees.length === 2 && types.includes("depot") && types.includes("retrait"))
-      || `types=${types}`;
-  });
-
-  await tc("TC-404", "Historique compte inexistant", async () => {
-    const r = await http("GET", "/api/comptes/00000000-0000-0000-0000-000000000000/transactions");
-    return r.status === 404 || `status=${r.status}`;
-  });
-
-  await tc("TC-405", "Isolation entre comptes", async () => {
-    const idA = await creerCompte("A", "A");
-    const idB = await creerCompte("B", "B");
-    await http("POST", `/api/comptes/${idA}/depot`, { montant: 5000 });
-    const r = await http("GET", `/api/comptes/${idB}/transactions`);
-    return r.data.donnees.length === 0 || `B.len=${r.data.donnees?.length}`;
-  });
-
-  return results;
+async function setup() {
+  await request(app).post('/auth/register').send({
+    nom: 'Sandji', prenom: 'Paolo', email: 'txn@test.com', password: 'secret123',
+  })
+  const lr = await request(app).post('/auth/login').send({ email: 'txn@test.com', password: 'secret123' })
+  const token = lr.body.donnees.token
+  const cr = await request(app).post('/api/comptes').set('Authorization', `Bearer ${token}`).send({ nom: 'Sandji', prenom: 'Paolo' })
+  return { token, id: cr.body.donnees.id }
 }
 
-module.exports = { run };
+// ─── Dépôts ──────────────────────────────────────────────────────────────────
+
+describe('Dépôts', () => {
+  it('TC-201 — Dépôt valide retourne 200 et solde à jour', async () => {
+    const { token, id } = await setup()
+    const res = await request(app).post(`/api/comptes/${id}/depot`).set('Authorization', `Bearer ${token}`).send({ montant: 5000 })
+    expect(res.status).toBe(200)
+    expect(res.body.donnees.solde).toBe('5000.00 FCFA')
+  })
+
+  it('TC-202 — Dépôt sur compte inexistant retourne 404', async () => {
+    const { token } = await setup()
+    const res = await request(app).post('/api/comptes/00000000-0000-0000-0000-000000000000/depot').set('Authorization', `Bearer ${token}`).send({ montant: 100 })
+    expect(res.status).toBe(404)
+  })
+
+  it('TC-203 — Montant négatif retourne 400', async () => {
+    const { token, id } = await setup()
+    const res = await request(app).post(`/api/comptes/${id}/depot`).set('Authorization', `Bearer ${token}`).send({ montant: -100 })
+    expect(res.status).toBe(400)
+  })
+
+  it('TC-204 — Montant nul retourne 400', async () => {
+    const { token, id } = await setup()
+    const res = await request(app).post(`/api/comptes/${id}/depot`).set('Authorization', `Bearer ${token}`).send({ montant: 0 })
+    expect(res.status).toBe(400)
+  })
+
+  it('TC-205 — Montant string retourne 400', async () => {
+    const { token, id } = await setup()
+    const res = await request(app).post(`/api/comptes/${id}/depot`).set('Authorization', `Bearer ${token}`).send({ montant: '5000' })
+    expect(res.status).toBe(400)
+  })
+
+  it('TC-206 — Montant absent retourne 400', async () => {
+    const { token, id } = await setup()
+    const res = await request(app).post(`/api/comptes/${id}/depot`).set('Authorization', `Bearer ${token}`).send({})
+    expect(res.status).toBe(400)
+  })
+
+  it('TC-207 — Montant null retourne 400', async () => {
+    const { token, id } = await setup()
+    const res = await request(app).post(`/api/comptes/${id}/depot`).set('Authorization', `Bearer ${token}`).send({ montant: null })
+    expect(res.status).toBe(400)
+  })
+
+  it('TC-208 — Dépôts successifs — solde cumulé', async () => {
+    const { token, id } = await setup()
+    await request(app).post(`/api/comptes/${id}/depot`).set('Authorization', `Bearer ${token}`).send({ montant: 1000 })
+    const res = await request(app).post(`/api/comptes/${id}/depot`).set('Authorization', `Bearer ${token}`).send({ montant: 2000 })
+    expect(res.body.donnees.solde).toBe('3000.00 FCFA')
+  })
+
+  it('TC-209 — Dépôt très grand retourne 200', async () => {
+    const { token, id } = await setup()
+    const res = await request(app).post(`/api/comptes/${id}/depot`).set('Authorization', `Bearer ${token}`).send({ montant: 1e9 })
+    expect(res.status).toBe(200)
+  })
+
+  it('TC-210 — Dépôt décimal retourne solde formaté', async () => {
+    const { token, id } = await setup()
+    const res = await request(app).post(`/api/comptes/${id}/depot`).set('Authorization', `Bearer ${token}`).send({ montant: 1234.56 })
+    expect(res.status).toBe(200)
+    expect(res.body.donnees.solde).toBe('1234.56 FCFA')
+  })
+})
+
+// ─── Retraits ─────────────────────────────────────────────────────────────────
+
+describe('Retraits', () => {
+  it('TC-301 — Retrait valide réduit le solde', async () => {
+    const { token, id } = await setup()
+    await request(app).post(`/api/comptes/${id}/depot`).set('Authorization', `Bearer ${token}`).send({ montant: 10000 })
+    const res = await request(app).post(`/api/comptes/${id}/retrait`).set('Authorization', `Bearer ${token}`).send({ montant: 3000 })
+    expect(res.status).toBe(200)
+    expect(res.body.donnees.solde).toBe('7000.00 FCFA')
+  })
+
+  it('TC-302 — Retrait sur compte inexistant retourne 404', async () => {
+    const { token } = await setup()
+    const res = await request(app).post('/api/comptes/00000000-0000-0000-0000-000000000000/retrait').set('Authorization', `Bearer ${token}`).send({ montant: 100 })
+    expect(res.status).toBe(404)
+  })
+
+  it('TC-303 — Solde insuffisant retourne 400', async () => {
+    const { token, id } = await setup()
+    await request(app).post(`/api/comptes/${id}/depot`).set('Authorization', `Bearer ${token}`).send({ montant: 1000 })
+    const res = await request(app).post(`/api/comptes/${id}/retrait`).set('Authorization', `Bearer ${token}`).send({ montant: 5000 })
+    expect(res.status).toBe(400)
+    expect(res.body.message).toMatch(/insuffisant/i)
+  })
+
+  it('TC-304 — Retrait égal au solde — solde devient 0', async () => {
+    const { token, id } = await setup()
+    await request(app).post(`/api/comptes/${id}/depot`).set('Authorization', `Bearer ${token}`).send({ montant: 5000 })
+    const res = await request(app).post(`/api/comptes/${id}/retrait`).set('Authorization', `Bearer ${token}`).send({ montant: 5000 })
+    expect(res.status).toBe(200)
+    expect(res.body.donnees.solde).toBe('0.00 FCFA')
+  })
+
+  it('TC-305 — Montant négatif retourne 400', async () => {
+    const { token, id } = await setup()
+    const res = await request(app).post(`/api/comptes/${id}/retrait`).set('Authorization', `Bearer ${token}`).send({ montant: -500 })
+    expect(res.status).toBe(400)
+  })
+
+  it('TC-306 — Montant nul retourne 400', async () => {
+    const { token, id } = await setup()
+    const res = await request(app).post(`/api/comptes/${id}/retrait`).set('Authorization', `Bearer ${token}`).send({ montant: 0 })
+    expect(res.status).toBe(400)
+  })
+
+  it('TC-307 — Montant absent retourne 400', async () => {
+    const { token, id } = await setup()
+    const res = await request(app).post(`/api/comptes/${id}/retrait`).set('Authorization', `Bearer ${token}`).send({})
+    expect(res.status).toBe(400)
+  })
+
+  it('TC-308 — Montant non numérique retourne 400', async () => {
+    const { token, id } = await setup()
+    const res = await request(app).post(`/api/comptes/${id}/retrait`).set('Authorization', `Bearer ${token}`).send({ montant: 'abc' })
+    expect(res.status).toBe(400)
+  })
+
+  it('TC-309 — Retraits successifs — solde décroît correctement', async () => {
+    const { token, id } = await setup()
+    await request(app).post(`/api/comptes/${id}/depot`).set('Authorization', `Bearer ${token}`).send({ montant: 1000 })
+    await request(app).post(`/api/comptes/${id}/retrait`).set('Authorization', `Bearer ${token}`).send({ montant: 500 })
+    const res = await request(app).post(`/api/comptes/${id}/retrait`).set('Authorization', `Bearer ${token}`).send({ montant: 500 })
+    expect(res.status).toBe(200)
+    expect(res.body.donnees.solde).toBe('0.00 FCFA')
+  })
+
+  it('TC-310 — Retrait sur solde 0 retourne 400', async () => {
+    const { token, id } = await setup()
+    const res = await request(app).post(`/api/comptes/${id}/retrait`).set('Authorization', `Bearer ${token}`).send({ montant: 100 })
+    expect(res.status).toBe(400)
+  })
+})

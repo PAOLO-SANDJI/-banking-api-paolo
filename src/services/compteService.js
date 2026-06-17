@@ -1,44 +1,46 @@
 const crypto = require("crypto");
-const { comptes, transactions } = require("./store");
+const { getDb } = require("./db");
 
-function creer(nom, prenom) {
-  const compte = {
-    id: crypto.randomUUID(),
-    nom,
-    prenom,
-    solde: 0,
-    dateCreation: new Date().toISOString(),
-  };
-  comptes.push(compte);
-  return compte;
+function creer(nom, prenom, utilisateurId = null) {
+  const id = crypto.randomUUID();
+  const dateCreation = new Date().toISOString();
+  getDb().prepare(
+    "INSERT INTO comptes (id, nom, prenom, solde, utilisateur_id, date_creation) VALUES (?, ?, ?, 0, ?, ?)"
+  ).run(id, nom, prenom, utilisateurId, dateCreation);
+  return trouverParId(id);
 }
 
-function lister() {
-  return comptes;
+function lister(utilisateurId = null) {
+  if (utilisateurId) {
+    return getDb().prepare("SELECT * FROM comptes WHERE utilisateur_id = ? ORDER BY date_creation DESC").all(utilisateurId);
+  }
+  return getDb().prepare("SELECT * FROM comptes ORDER BY date_creation DESC").all();
 }
 
-function trouverParId(id) {
-  return comptes.find((c) => c.id === id);
+function trouverParId(id, utilisateurId = null) {
+  if (utilisateurId) {
+    return getDb().prepare("SELECT * FROM comptes WHERE id = ? AND utilisateur_id = ?").get(id, utilisateurId) || null;
+  }
+  return getDb().prepare("SELECT * FROM comptes WHERE id = ?").get(id) || null;
+}
+
+function mettreAJourSolde(id, nouveauSolde) {
+  getDb().prepare("UPDATE comptes SET solde = ? WHERE id = ?").run(nouveauSolde, id);
+  return trouverParId(id);
 }
 
 function supprimer(id) {
-  const index = comptes.findIndex((c) => c.id === id);
-  if (index === -1) return null;
+  const compte = trouverParId(id);
+  if (!compte) return null;
 
-  const compteSupprime = comptes[index];
-  comptes.splice(index, 1);
+  // Compter les transactions avant suppression
+  const nb = getDb().prepare("SELECT COUNT(*) AS nb FROM transactions WHERE compte_id = ?").get(id).nb;
 
-  const avant = transactions.length;
-  for (let i = transactions.length - 1; i >= 0; i--) {
-    if (transactions[i].compteId === compteSupprime.id) {
-      transactions.splice(i, 1);
-    }
-  }
+  // Supprimer en cascade (transactions puis compte)
+  getDb().prepare("DELETE FROM transactions WHERE compte_id = ?").run(id);
+  getDb().prepare("DELETE FROM comptes WHERE id = ?").run(id);
 
-  return {
-    compte: compteSupprime,
-    transactionsSupprimees: avant - transactions.length,
-  };
+  return { compte, transactionsSupprimees: nb };
 }
 
-module.exports = { creer, lister, trouverParId, supprimer };
+module.exports = { creer, lister, trouverParId, mettreAJourSolde, supprimer };

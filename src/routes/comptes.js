@@ -1,5 +1,6 @@
 const { Router } = require("express");
 const compteService = require("../services/compteService");
+const { authentifier } = require("../middleware/auth");
 const { formaterCompte, reponse } = require("../utils/format");
 
 const router = Router();
@@ -9,44 +10,29 @@ const router = Router();
  * /api/comptes:
  *   post:
  *     summary: Créer un nouveau compte bancaire
- *     description: |
- *       Crée un compte bancaire avec un solde initial de 0 FCFA.
- *       Un UUID v4 est généré automatiquement.
- *       **Validation** : les champs `nom` et `prenom` sont requis et non vides.
  *     tags: [Comptes]
+ *     security:
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             $ref: '#/components/schemas/CreerCompteRequete'
- *           examples:
- *             valide:
- *               summary: Requête valide
- *               value: { nom: "Sandji", prenom: "Paolo" }
- *             manquant:
- *               summary: Champ manquant
- *               value: { nom: "Sandji" }
  *     responses:
  *       201:
  *         description: Compte créé avec succès
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/Reponse'
- *                 - type: object
- *                   properties:
- *                     donnees: { $ref: '#/components/schemas/Compte' }
  *       400:
  *         $ref: '#/components/responses/ChampsManquants'
+ *       401:
+ *         description: Non authentifié
  */
-router.post("/", (req, res) => {
+router.post("/", authentifier, (req, res) => {
   const { nom, prenom } = req.body || {};
   if (!nom || !prenom) {
     return res.status(400).json({ erreur: "Les champs 'nom' et 'prenom' sont requis." });
   }
-  const compte = compteService.creer(nom, prenom);
+  const compte = compteService.creer(nom, prenom, req.utilisateur.id);
   reponse(res, 201, "Compte créé avec succès.", formaterCompte(compte));
 });
 
@@ -54,24 +40,18 @@ router.post("/", (req, res) => {
  * @openapi
  * /api/comptes:
  *   get:
- *     summary: Lister tous les comptes
+ *     summary: Lister mes comptes
  *     tags: [Comptes]
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Liste des comptes (peut être vide)
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/Reponse'
- *                 - type: object
- *                   properties:
- *                     donnees:
- *                       type: array
- *                       items: { $ref: '#/components/schemas/Compte' }
+ *         description: Liste des comptes de l'utilisateur connecté
+ *       401:
+ *         description: Non authentifié
  */
-router.get("/", (req, res) => {
-  const tous = compteService.lister();
+router.get("/", authentifier, (req, res) => {
+  const tous = compteService.lister(req.utilisateur.id);
   reponse(res, 200, `${tous.length} compte(s) trouvé(s).`, tous.map(formaterCompte));
 });
 
@@ -81,6 +61,8 @@ router.get("/", (req, res) => {
  *   get:
  *     summary: Consulter un compte par son ID
  *     tags: [Comptes]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -89,19 +71,13 @@ router.get("/", (req, res) => {
  *     responses:
  *       200:
  *         description: Compte trouvé
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/Reponse'
- *                 - type: object
- *                   properties:
- *                     donnees: { $ref: '#/components/schemas/Compte' }
  *       404:
  *         $ref: '#/components/responses/CompteIntrouvable'
+ *       401:
+ *         description: Non authentifié
  */
-router.get("/:id", (req, res) => {
-  const compte = compteService.trouverParId(req.params.id);
+router.get("/:id", authentifier, (req, res) => {
+  const compte = compteService.trouverParId(req.params.id, req.utilisateur.id);
   if (!compte) return reponse(res, 404, "Compte introuvable.", null);
   reponse(res, 200, "Compte trouvé.", formaterCompte(compte));
 });
@@ -111,10 +87,9 @@ router.get("/:id", (req, res) => {
  * /api/comptes/{id}:
  *   delete:
  *     summary: Supprimer un compte bancaire (cascade)
- *     description: |
- *       Supprime définitivement un compte et toutes ses transactions associées.
- *       L'opération est irréversible.
  *     tags: [Comptes]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -123,22 +98,16 @@ router.get("/:id", (req, res) => {
  *     responses:
  *       200:
  *         description: Compte supprimé
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/Reponse'
- *                 - type: object
- *                   properties:
- *                     donnees:
- *                       type: object
- *                       properties:
- *                         compteSupprime: { type: string, format: uuid }
- *                         transactionsSupprimees: { type: integer }
  *       404:
  *         $ref: '#/components/responses/CompteIntrouvable'
+ *       401:
+ *         description: Non authentifié
  */
-router.delete("/:id", (req, res) => {
+router.delete("/:id", authentifier, (req, res) => {
+  // Vérifier que le compte appartient à l'utilisateur
+  const compte = compteService.trouverParId(req.params.id, req.utilisateur.id);
+  if (!compte) return reponse(res, 404, "Compte introuvable.", null);
+
   const resultat = compteService.supprimer(req.params.id);
   if (!resultat) return reponse(res, 404, "Compte introuvable.", null);
   reponse(res, 200, "Compte supprimé avec succès.", {
